@@ -1,0 +1,13 @@
+# Build output (regenerate with ./build.sh)
+dist/
+
+# web-ext sign output
+web-ext-artifacts/
+
+# OS/editor junk
+.DS_Store
+Thumbs.db
+*.swp
+
+# In case tooling gets added later
+node_modules/

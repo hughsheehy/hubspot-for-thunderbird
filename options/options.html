@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title data-i18n="options_page_title"></title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div id="app">
+    <h1 data-i18n="options_page_title"></h1>
+
+    <section class="card">
+      <h2 data-i18n="options_setup_heading"></h2>
+      <p data-i18n="options_setup_intro"></p>
+      <p class="callout-warning" data-i18n="options_credential_warning"></p>
+      <ol>
+        <li data-i18n="options_step1"></li>
+        <li data-i18n="options_step2"></li>
+        <li data-i18n="options_step3"></li>
+      </ol>
+
+      <h3 data-i18n="options_scopes_heading"></h3>
+      <table class="scopes-table">
+        <thead>
+          <tr>
+            <th data-i18n="options_scope_col_scope"></th>
+            <th data-i18n="options_scope_col_needed"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code data-i18n="options_scope_contacts_read"></code></td><td data-i18n="options_scope_contacts_read_desc"></td></tr>
+          <tr><td><code data-i18n="options_scope_contacts_write"></code></td><td data-i18n="options_scope_contacts_write_desc"></td></tr>
+          <tr><td><code data-i18n="options_scope_deals_read"></code></td><td data-i18n="options_scope_deals_read_desc"></td></tr>
+          <tr><td><code data-i18n="options_scope_owners_read"></code></td><td data-i18n="options_scope_owners_read_desc"></td></tr>
+          <tr><td><code data-i18n="options_scope_sales_email_read"></code></td><td data-i18n="options_scope_sales_email_read_desc"></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <label class="field-label" for="token-input" data-i18n="options_token_label"></label>
+      <div class="token-row">
+        <input type="password" id="token-input" data-i18n-placeholder="options_token_placeholder" autocomplete="off">
+        <button type="button" id="toggle-token-btn">👁</button>
+      </div>
+      <p class="field-help" data-i18n="options_token_help"></p>
+
+      <label class="field-label" for="portal-id-input" data-i18n="options_portal_id_label"></label>
+      <input type="text" id="portal-id-input" inputmode="numeric">
+      <p class="field-help" data-i18n="options_portal_id_help"></p>
+
+      <label class="field-label" for="bcc-input" data-i18n="options_bcc_label"></label>
+      <input type="email" id="bcc-input">
+      <p class="field-help" data-i18n="options_bcc_help"></p>
+
+      <label class="field-label" for="currency-select" data-i18n="options_currency_label"></label>
+      <select id="currency-select">
+        <option value="USD">USD — US Dollar</option>
+        <option value="EUR">EUR — Euro</option>
+        <option value="GBP">GBP — British Pound</option>
+        <option value="CAD">CAD — Canadian Dollar</option>
+        <option value="AUD">AUD — Australian Dollar</option>
+        <option value="JPY">JPY — Japanese Yen</option>
+        <option value="other">Other…</option>
+      </select>
+      <input type="text" id="currency-custom-input" placeholder="ISO 4217 code, e.g. CHF" hidden>
+
+      <label class="field-label" for="never-log-textarea" data-i18n="options_never_log_label"></label>
+      <textarea id="never-log-textarea" rows="5" data-i18n-placeholder="options_never_log_placeholder"></textarea>
+      <p class="field-help" data-i18n="options_never_log_help"></p>
+
+      <div class="actions-row">
+        <button type="button" id="test-connection-btn" data-i18n="options_test_button"></button>
+        <button type="button" id="save-btn" class="primary" data-i18n="options_save_button"></button>
+      </div>
+      <p id="test-status" class="status-line"></p>
+      <p id="save-status" class="status-line"></p>
+    </section>
+
+    <p class="privacy-note" data-i18n="options_privacy_note"></p>
+  </div>
+
+  <script src="../popup/common.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>
