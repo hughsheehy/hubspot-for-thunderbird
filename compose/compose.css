@@ -38,6 +38,17 @@
   text-align: center;
 }
 
+.recipient-create-btn {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.recipient-create-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+  text-decoration: none;
+}
+
 .recipient-details {
   padding: 4px 0 10px;
 }

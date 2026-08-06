@@ -111,12 +111,65 @@ function renderRecipients(recipients) {
       right.appendChild(chevron);
       row.classList.add("expandable");
       row.addEventListener("click", () => toggleRecipientDetails(wrapper, chevron, r.email));
+    } else if (r.state === "not_found") {
+      const createBtn = document.createElement("button");
+      createBtn.type = "button";
+      createBtn.className = "link-button recipient-create-btn";
+      createBtn.textContent = i18n("compose_create_contact_button");
+      createBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        handleCreateRecipientContact(createBtn, wrapper, r);
+      });
+      right.appendChild(createBtn);
     }
 
     row.appendChild(right);
     wrapper.appendChild(row);
     list.appendChild(wrapper);
   }
+}
+
+async function handleCreateRecipientContact(button, wrapper, recipient) {
+  button.disabled = true;
+  button.textContent = i18n("compose_creating_contact");
+
+  const displayName = recipient.name && recipient.name !== recipient.email ? recipient.name : "";
+  const nameParts = displayName.split(" ").filter(Boolean);
+  const properties = {};
+  if (nameParts.length) {
+    properties.firstname = nameParts[0];
+    if (nameParts.length > 1) properties.lastname = nameParts.slice(1).join(" ");
+  }
+
+  try {
+    const result = await browser.runtime.sendMessage({
+      type: "createContact",
+      email: recipient.email,
+      properties
+    });
+
+    if (result.status === "created") {
+      recipientDetailsCache.delete(recipient.email);
+      await load(); // re-run the lookup so the row now renders as "found"
+      return;
+    }
+    showRecipientCreateError(wrapper, result.error || i18n("panel_create_contact_error"));
+  } catch (err) {
+    showRecipientCreateError(wrapper, err && err.message ? err.message : i18n("panel_create_contact_error"));
+  } finally {
+    button.disabled = false;
+    button.textContent = i18n("compose_create_contact_button");
+  }
+}
+
+function showRecipientCreateError(wrapper, message) {
+  let status = wrapper.querySelector(".recipient-create-status");
+  if (!status) {
+    status = document.createElement("p");
+    status.className = "status-line error recipient-create-status";
+    wrapper.appendChild(status);
+  }
+  status.textContent = message;
 }
 
 async function toggleRecipientDetails(wrapper, chevron, email) {

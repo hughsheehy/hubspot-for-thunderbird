@@ -56,6 +56,8 @@
   "compose_recipient_never_log": { "message": "Never-log" },
   "compose_recipient_logging_bcc": { "message": "Logging BCC" },
   "compose_recipient_error": { "message": "Lookup failed" },
+  "compose_create_contact_button": { "message": "Create contact" },
+  "compose_creating_contact": { "message": "Creating…" },
   "compose_add_bcc_button": { "message": "Add logging BCC" },
   "compose_bcc_added": { "message": "BCC added." },
   "compose_bcc_already_present": { "message": "Logging BCC is already on this message." },

@@ -14,7 +14,7 @@
 // this exact build tag) in the Inspect console right after reloading the
 // add-on, Thunderbird is still running the previous build — temporary
 // add-ons don't pick up file changes until you explicitly reload them.
-console.info("[HubSpot for Thunderbird] background.js loaded — build 0.1.2 (compose-expandable-details)");
+console.info("[HubSpot for Thunderbird] background.js loaded — build 0.1.3 (compose-create-contact)");
 
 const HUBSPOT_API_BASE = "https://api.hubapi.com";
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -433,7 +433,7 @@ browser.runtime.onMessage.addListener((msg) => {
     case "lookupForDisplayedMessage":
       return withErrorStatus(handleLookupForDisplayedMessage(msg.tabId));
 
-    case "createContactForDisplayedMessage":
+    case "createContact":
       return withErrorStatus(handleCreateContact(msg.email, msg.properties));
 
     case "logDisplayedMessage":

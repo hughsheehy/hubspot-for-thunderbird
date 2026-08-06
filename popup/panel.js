@@ -148,7 +148,7 @@ async function handleCreateContact() {
 
   try {
     const result = await browser.runtime.sendMessage({
-      type: "createContactForDisplayedMessage",
+      type: "createContact",
       email: currentEmail,
       properties
     });
