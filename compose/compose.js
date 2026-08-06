@@ -12,7 +12,7 @@ let currentTabId = null;
 const recipientDetailsCache = new Map();
 
 function showState(id) {
-  for (const s of ["state-loading", "state-not-configured", "state-ready"]) {
+  for (const s of ["state-loading", "state-not-configured", "state-error", "state-ready"]) {
     document.getElementById(s).hidden = s !== id;
   }
 }
@@ -25,27 +25,50 @@ async function getActiveTabId() {
 async function load() {
   showState("state-loading");
 
-  currentTabId = await getActiveTabId();
-  if (currentTabId === null) return;
+  try {
+    currentTabId = await getActiveTabId();
+    if (currentTabId === null) {
+      showError();
+      return;
+    }
 
-  const result = await browser.runtime.sendMessage({
-    type: "lookupComposeRecipients",
-    tabId: currentTabId
-  });
+    const result = await browser.runtime.sendMessage({
+      type: "lookupComposeRecipients",
+      tabId: currentTabId
+    });
 
-  if (result.status === "not_configured") {
-    showState("state-not-configured");
-    return;
+    if (result.status === "not_configured") {
+      showState("state-not-configured");
+      return;
+    }
+    if (result.status === "error") {
+      showError(result.error);
+      return;
+    }
+
+    renderRecipients(result.recipients || []);
+    const addBccBtn = document.getElementById("add-bcc-btn");
+    addBccBtn.disabled = !result.bccAddress || !!result.loggingBlockedBy;
+    document.getElementById("bcc-status").textContent = result.loggingBlockedBy
+      ? i18n("compose_bcc_never_log_blocked", [result.loggingBlockedBy])
+      : result.bccAddress
+        ? ""
+        : i18n("compose_no_bcc_configured");
+
+    showState("state-ready");
+  } catch (err) {
+    showError(err);
   }
+}
 
-  renderRecipients(result.recipients);
-  const addBccBtn = document.getElementById("add-bcc-btn");
-  addBccBtn.disabled = !result.bccAddress;
-  document.getElementById("bcc-status").textContent = result.bccAddress
-    ? ""
-    : i18n("compose_no_bcc_configured");
-
-  showState("state-ready");
+function showError(err) {
+  document.getElementById("error-message").textContent =
+    typeof err === "string"
+      ? err
+      : err && err.message
+        ? err.message
+        : i18n("panel_error_generic");
+  showState("state-error");
 }
 
 function renderRecipients(recipients) {
@@ -115,9 +138,16 @@ async function toggleRecipientDetails(wrapper, chevron, email) {
   wrapper.appendChild(details);
 
   let result = recipientDetailsCache.get(email);
-  if (!result) {
-    result = await browser.runtime.sendMessage({ type: "getComposeRecipientDetails", email });
-    recipientDetailsCache.set(email, result);
+  try {
+    if (!result) {
+      result = await browser.runtime.sendMessage({ type: "getComposeRecipientDetails", email });
+      recipientDetailsCache.set(email, result);
+    }
+  } catch (err) {
+    result = {
+      status: "error",
+      error: err && err.message ? err.message : i18n("panel_error_generic")
+    };
   }
 
   details.innerHTML = "";
@@ -201,32 +231,44 @@ function badgeKey(state) {
 async function handleAddBcc() {
   const btn = document.getElementById("add-bcc-btn");
   const status = document.getElementById("bcc-status");
+  let keepDisabled = false;
   btn.disabled = true;
 
-  const result = await browser.runtime.sendMessage({
-    type: "addLoggingBcc",
-    tabId: currentTabId
-  });
+  try {
+    const result = await browser.runtime.sendMessage({
+      type: "addLoggingBcc",
+      tabId: currentTabId
+    });
 
-  switch (result.status) {
-    case "added":
-      status.classList.remove("error");
-      status.textContent = i18n("compose_bcc_added");
-      break;
-    case "already_present":
-      status.classList.remove("error");
-      status.textContent = i18n("compose_bcc_already_present");
-      break;
-    case "no_bcc_configured":
-      status.classList.add("error");
-      status.textContent = i18n("compose_no_bcc_configured");
-      break;
-    default:
-      status.classList.add("error");
-      status.textContent = i18n("panel_error_generic");
+    switch (result.status) {
+      case "added":
+        status.classList.remove("error");
+        status.textContent = i18n("compose_bcc_added");
+        break;
+      case "already_present":
+        status.classList.remove("error");
+        status.textContent = i18n("compose_bcc_already_present");
+        break;
+      case "no_bcc_configured":
+        keepDisabled = true;
+        status.classList.add("error");
+        status.textContent = i18n("compose_no_bcc_configured");
+        break;
+      case "never_log":
+        keepDisabled = true;
+        status.classList.add("error");
+        status.textContent = i18n("compose_bcc_never_log_blocked", [result.email]);
+        break;
+      default:
+        status.classList.add("error");
+        status.textContent = result.error || i18n("panel_error_generic");
+    }
+  } catch (err) {
+    status.classList.add("error");
+    status.textContent = err && err.message ? err.message : i18n("panel_error_generic");
+  } finally {
+    btn.disabled = keepDisabled;
   }
-
-  btn.disabled = false;
 }
 
 document.addEventListener("DOMContentLoaded", () => {

@@ -17,13 +17,18 @@
       <button id="open-settings-btn" class="link-button" data-i18n="panel_error_not_configured_link"></button>
     </div>
 
+    <div id="state-error" class="state" hidden>
+      <h3 data-i18n="panel_error_heading"></h3>
+      <p id="error-message" role="alert"></p>
+    </div>
+
     <div id="state-ready" class="state" hidden>
       <h4 data-i18n="compose_heading"></h4>
       <div id="recipients-list"></div>
       <p id="no-recipients" class="status-line" data-i18n="compose_no_recipients" hidden></p>
 
       <button id="add-bcc-btn" class="primary" data-i18n="compose_add_bcc_button"></button>
-      <p id="bcc-status" class="status-line"></p>
+      <p id="bcc-status" class="status-line" aria-live="polite"></p>
     </div>
 
   </div>

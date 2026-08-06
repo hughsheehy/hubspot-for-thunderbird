@@ -41,7 +41,7 @@
       <label class="field-label" for="token-input" data-i18n="options_token_label"></label>
       <div class="token-row">
         <input type="password" id="token-input" data-i18n-placeholder="options_token_placeholder" autocomplete="off">
-        <button type="button" id="toggle-token-btn">👁</button>
+        <button type="button" id="toggle-token-btn" data-i18n-aria-label="options_toggle_token_label">👁</button>
       </div>
       <p class="field-help" data-i18n="options_token_help"></p>
 
@@ -73,8 +73,8 @@
         <button type="button" id="test-connection-btn" data-i18n="options_test_button"></button>
         <button type="button" id="save-btn" class="primary" data-i18n="options_save_button"></button>
       </div>
-      <p id="test-status" class="status-line"></p>
-      <p id="save-status" class="status-line"></p>
+      <p id="test-status" class="status-line" aria-live="polite"></p>
+      <p id="save-status" class="status-line" aria-live="polite"></p>
     </section>
 
     <p class="privacy-note" data-i18n="options_privacy_note"></p>

@@ -146,6 +146,10 @@ function applyI18n(root) {
     const msg = browser.i18n.getMessage(el.getAttribute("data-i18n-title"));
     if (msg) el.setAttribute("title", msg);
   });
+  scope.querySelectorAll("[data-i18n-aria-label]").forEach((el) => {
+    const msg = browser.i18n.getMessage(el.getAttribute("data-i18n-aria-label"));
+    if (msg) el.setAttribute("aria-label", msg);
+  });
 }
 
 function i18n(key, subs) {

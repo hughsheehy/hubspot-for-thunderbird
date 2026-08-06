@@ -26,13 +26,13 @@
 
     <div id="state-error" class="state" hidden>
       <h3 data-i18n="panel_error_heading"></h3>
-      <p id="error-message"></p>
+      <p id="error-message" role="alert"></p>
     </div>
 
     <div id="state-not-found" class="state" hidden>
       <p id="not-found-message"></p>
       <button id="create-contact-btn" class="primary" data-i18n="panel_create_contact_button"></button>
-      <p id="create-contact-status" class="status-line"></p>
+      <p id="create-contact-status" class="status-line" aria-live="polite"></p>
     </div>
 
     <div id="state-found" class="state" hidden>
@@ -58,7 +58,7 @@
       </div>
 
       <button id="log-button" class="primary" data-i18n="panel_log_button"></button>
-      <p id="log-status" class="status-line"></p>
+      <p id="log-status" class="status-line" aria-live="polite"></p>
     </div>
 
   </div>

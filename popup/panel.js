@@ -35,18 +35,28 @@ async function getActiveTabId() {
 async function load() {
   showState("state-loading");
 
-  currentTabId = await getActiveTabId();
-  if (currentTabId === null) {
-    showState("state-no-message");
-    return;
+  try {
+    currentTabId = await getActiveTabId();
+    if (currentTabId === null) {
+      showState("state-no-message");
+      return;
+    }
+
+    const result = await browser.runtime.sendMessage({
+      type: "lookupForDisplayedMessage",
+      tabId: currentTabId
+    });
+
+    render(result);
+  } catch (err) {
+    showError(err);
   }
+}
 
-  const result = await browser.runtime.sendMessage({
-    type: "lookupForDisplayedMessage",
-    tabId: currentTabId
-  });
-
-  render(result);
+function showError(err) {
+  document.getElementById("error-message").textContent =
+    err && err.message ? err.message : i18n("panel_error_generic");
+  showState("state-error");
 }
 
 function render(result) {
@@ -136,18 +146,24 @@ async function handleCreateContact() {
     if (nameParts.length > 1) properties.lastname = nameParts.slice(1).join(" ");
   }
 
-  const result = await browser.runtime.sendMessage({
-    type: "createContactForDisplayedMessage",
-    email: currentEmail,
-    properties
-  });
+  try {
+    const result = await browser.runtime.sendMessage({
+      type: "createContactForDisplayedMessage",
+      email: currentEmail,
+      properties
+    });
 
-  if (result.status === "created") {
-    await load(); // re-run the lookup so it now renders as "found"
-  } else {
-    btn.disabled = false;
+    if (result.status === "created") {
+      await load(); // re-run the lookup so it now renders as "found"
+      return;
+    }
     status.classList.add("error");
     status.textContent = result.error || i18n("panel_create_contact_error");
+  } catch (err) {
+    status.classList.add("error");
+    status.textContent = err && err.message ? err.message : i18n("panel_create_contact_error");
+  } finally {
+    btn.disabled = false;
   }
 }
 
@@ -158,17 +174,26 @@ async function handleLogMessage() {
   status.classList.remove("error");
   status.textContent = i18n("panel_logging");
 
-  const result = await browser.runtime.sendMessage({
-    type: "logDisplayedMessage",
-    tabId: currentTabId
-  });
+  try {
+    const result = await browser.runtime.sendMessage({
+      type: "logDisplayedMessage",
+      tabId: currentTabId
+    });
 
-  btn.disabled = false;
-  if (result.status === "logged") {
-    status.textContent = i18n("panel_log_success");
-  } else {
+    if (result.status === "logged") {
+      status.textContent = i18n("panel_log_success");
+    } else if (result.status === "never_log") {
+      status.classList.add("error");
+      status.textContent = i18n("panel_log_never_log_blocked", [result.email]);
+    } else {
+      status.classList.add("error");
+      status.textContent = result.error || i18n("panel_log_error");
+    }
+  } catch (err) {
     status.classList.add("error");
-    status.textContent = result.error || i18n("panel_log_error");
+    status.textContent = err && err.message ? err.message : i18n("panel_log_error");
+  } finally {
+    btn.disabled = false;
   }
 }
 

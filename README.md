@@ -154,6 +154,15 @@ five minutes and cleared whenever settings change.
 Strings live in `_locales/en/messages.json`. To add a language, copy that folder
 to `_locales/<code>/` and translate the `message` values.
 
+Run the dependency-free test suite with Node.js 18 or later:
+
+```sh
+npm test
+```
+
+The tests execute the background scripts with mocked Thunderbird APIs, so they
+do not need a Thunderbird profile or HubSpot account.
+
 ### Notes on the HubSpot API calls made here
 
 - Contact lookup: `POST /crm/v3/objects/contacts/search`, exact match on `email`.

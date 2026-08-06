@@ -192,6 +192,12 @@ async function logEmailMessage(token, contactId, { subject, bodyText, direction,
   });
 }
 
+function messageTimestampMs(value, fallback = Date.now()) {
+  if (!value) return fallback;
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? fallback : timestamp;
+}
+
 // ---------------------------------------------------------------------------
 // Activity history (emails, calls, meetings, notes) for the contact panel
 //
@@ -378,6 +384,35 @@ async function resolveCounterpart(tabId) {
   return { address: targetAddr, youSent: authorIsMe, message };
 }
 
+function addressesFromHeaders(headers) {
+  return dedupeAddresses([].concat(...headers).flatMap(parseAddressList));
+}
+
+function findNeverLoggedParticipant(addresses, neverLogList) {
+  return addresses.find((address) => isNeverLogged(address.email, neverLogList)) || null;
+}
+
+function displayedMessageParticipants(message) {
+  return addressesFromHeaders([
+    message.author || "",
+    message.recipients || [],
+    message.ccList || [],
+    message.bccList || []
+  ]);
+}
+
+async function composeParticipants(details) {
+  const identities = await browser.identities.list();
+  const identity = identities.find((item) => item.id === details.identityId);
+  return addressesFromHeaders([
+    identity && identity.email ? identity.email : [],
+    details.replyTo || [],
+    details.to || [],
+    details.cc || [],
+    details.bcc || []
+  ]);
+}
+
 // ---------------------------------------------------------------------------
 // Message router
 // ---------------------------------------------------------------------------
@@ -396,27 +431,34 @@ browser.runtime.onMessage.addListener((msg) => {
         .catch((err) => ({ ok: false, error: err.message }));
 
     case "lookupForDisplayedMessage":
-      return handleLookupForDisplayedMessage(msg.tabId);
+      return withErrorStatus(handleLookupForDisplayedMessage(msg.tabId));
 
     case "createContactForDisplayedMessage":
-      return handleCreateContact(msg.email, msg.properties);
+      return withErrorStatus(handleCreateContact(msg.email, msg.properties));
 
     case "logDisplayedMessage":
-      return handleLogDisplayedMessage(msg.tabId);
+      return withErrorStatus(handleLogDisplayedMessage(msg.tabId));
 
     case "lookupComposeRecipients":
-      return handleLookupComposeRecipients(msg.tabId);
+      return withErrorStatus(handleLookupComposeRecipients(msg.tabId));
 
     case "getComposeRecipientDetails":
-      return handleGetRecipientDetails(msg.email);
+      return withErrorStatus(handleGetRecipientDetails(msg.email));
 
     case "addLoggingBcc":
-      return handleAddLoggingBcc(msg.tabId);
+      return withErrorStatus(handleAddLoggingBcc(msg.tabId));
 
     default:
       return undefined; // not for us
   }
 });
+
+function withErrorStatus(promise) {
+  return Promise.resolve(promise).catch((err) => ({
+    status: "error",
+    error: err && err.message ? err.message : String(err)
+  }));
+}
 
 function normalizeIncomingSettings(settings) {
   const next = Object.assign({}, settings);
@@ -491,8 +533,12 @@ async function handleLogDisplayedMessage(tabId) {
   if (!counterpart || !counterpart.address) return { status: "no_message" };
 
   const email = counterpart.address.email;
-  if (isNeverLogged(email, settings.neverLogList)) {
-    return { status: "never_log", email };
+  const excludedParticipant = findNeverLoggedParticipant(
+    displayedMessageParticipants(counterpart.message),
+    settings.neverLogList
+  );
+  if (excludedParticipant) {
+    return { status: "never_log", email: excludedParticipant.email };
   }
 
   try {
@@ -502,9 +548,7 @@ async function handleLogDisplayedMessage(tabId) {
     const full = await browser.messages.getFull(counterpart.message.id);
     const subject = counterpart.message.subject || "";
     const bodyText = extractPlainTextBody(full);
-    const timestampMs = counterpart.message.date
-      ? new Date(counterpart.message.date).getTime()
-      : Date.now();
+    const timestampMs = messageTimestampMs(counterpart.message.date);
 
     await logEmailMessage(settings.accessToken, bundle.contact.id, {
       subject,
@@ -524,9 +568,9 @@ async function handleLookupComposeRecipients(tabId) {
   if (!settings.accessToken) return { status: "not_configured" };
 
   const details = await browser.compose.getComposeDetails(tabId);
-  const headers = [].concat(details.to || [], details.cc || [], details.bcc || []);
-  const addresses = dedupeAddresses(headers.flatMap(parseAddressList));
+  const addresses = await composeParticipants(details);
   const bccLower = settings.bccAddress ? settings.bccAddress.toLowerCase() : null;
+  const excludedParticipant = findNeverLoggedParticipant(addresses, settings.neverLogList);
 
   const results = await Promise.all(
     addresses.map(async (addr) => {
@@ -553,7 +597,12 @@ async function handleLookupComposeRecipients(tabId) {
     })
   );
 
-  return { status: "ok", recipients: results, bccAddress: settings.bccAddress };
+  return {
+    status: "ok",
+    recipients: results,
+    bccAddress: settings.bccAddress,
+    loggingBlockedBy: excludedParticipant ? excludedParticipant.email : null
+  };
 }
 
 // Full contact + deals + activity bundle for one compose recipient,
@@ -588,9 +637,15 @@ async function handleAddLoggingBcc(tabId) {
   if (!settings.bccAddress) return { status: "no_bcc_configured" };
 
   const details = await browser.compose.getComposeDetails(tabId);
-  const existingBcc = dedupeAddresses(
-    [].concat(details.bcc || []).flatMap(parseAddressList)
+  const excludedParticipant = findNeverLoggedParticipant(
+    await composeParticipants(details),
+    settings.neverLogList
   );
+  if (excludedParticipant) {
+    return { status: "never_log", email: excludedParticipant.email };
+  }
+
+  const existingBcc = addressesFromHeaders([details.bcc || []]);
   const already = existingBcc.some(
     (a) => a.email.toLowerCase() === settings.bccAddress.toLowerCase()
   );
