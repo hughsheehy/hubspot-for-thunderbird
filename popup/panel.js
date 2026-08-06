@@ -102,7 +102,7 @@ function render(result) {
 }
 
 function renderFound(result) {
-  const { contact, owner, deals, portalId, currencyCode, youSent } = result;
+  const { contact, owner, company, deals, portalId, currencyCode, youSent } = result;
   const props = contact.properties || {};
 
   document.getElementById("you-sent-note").hidden = !youSent;
@@ -118,7 +118,12 @@ function renderFound(result) {
     openLink.hidden = true;
   }
 
-  renderContactFieldsInto(document.getElementById("contact-fields"), props, ownerDisplayLabel(owner));
+  renderContactFieldsInto(
+    document.getElementById("contact-fields"),
+    props,
+    ownerDisplayLabel(owner),
+    companyDisplayLabel(company)
+  );
   renderDealsListInto(document.getElementById("deals-list"), deals, currencyCode);
   renderActivityListInto(document.getElementById("activity-list"), result.activities || []);
 

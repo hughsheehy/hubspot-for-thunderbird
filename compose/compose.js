@@ -217,7 +217,7 @@ function renderRecipientDetails(container, result) {
     return;
   }
 
-  const { contact, owner, deals, activities, portalId, currencyCode } = result;
+  const { contact, owner, company, deals, activities, portalId, currencyCode } = result;
   const props = contact.properties || {};
 
   const card = document.createElement("div");
@@ -242,7 +242,7 @@ function renderRecipientDetails(container, result) {
 
   const dl = document.createElement("dl");
   dl.className = "contact-fields";
-  renderContactFieldsInto(dl, props, ownerDisplayLabel(owner));
+  renderContactFieldsInto(dl, props, ownerDisplayLabel(owner), companyDisplayLabel(company));
   card.appendChild(dl);
   container.appendChild(card);
 

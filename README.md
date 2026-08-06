@@ -71,6 +71,7 @@ getting a HubSpot access token; the short version:
    |---|---|
    | `crm.objects.contacts.read` | looking anyone up, and calls/meetings/notes in Recent activity — required |
    | `crm.objects.contacts.write` | the "Create contact" button |
+   | `crm.objects.companies.read` | showing the contact's associated company |
    | `crm.objects.deals.read` | showing deals |
    | `crm.objects.owners.read` | showing the record owner |
    | `sales-email-read` | logging messages, and emails in Recent activity |
@@ -166,6 +167,17 @@ do not need a Thunderbird profile or HubSpot account.
 ### Notes on the HubSpot API calls made here
 
 - Contact lookup: `POST /crm/v3/objects/contacts/search`, exact match on `email`.
+- Company: `GET /crm/v4/objects/contacts/{id}/associations/companies` (v4,
+  not v3 like the rest of this list — needed for the association-type/label
+  data that identifies which associated company, if any, is flagged
+  "Primary"; matched by `typeId` rather than the label text, since HubSpot's
+  labels can be renamed per portal), then `GET /crm/v3/objects/companies/{id}`
+  for that company's name. Shown alongside, not instead of, the contact's own
+  free-text "Company Name" property — the two can disagree, since the text
+  property only reflects the association if it was set by typing into the
+  field rather than via the Associations panel. A contact can have more than
+  one associated company; only the one flagged Primary (or the first one, if
+  none is) is shown.
 - Deals: `GET /crm/v3/objects/contacts/{id}/associations/deals`, then
   `POST /crm/v3/objects/deals/batch/read`.
 - Owner: `GET /crm/v3/owners/{id}`.

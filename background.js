@@ -14,7 +14,7 @@
 // this exact build tag) in the Inspect console right after reloading the
 // add-on, Thunderbird is still running the previous build — temporary
 // add-ons don't pick up file changes until you explicitly reload them.
-console.info("[HubSpot for Thunderbird] background.js loaded — build 0.1.3 (compose-create-contact)");
+console.info("[HubSpot for Thunderbird] background.js loaded — build 0.1.4 (contact-company)");
 
 const HUBSPOT_API_BASE = "https://api.hubapi.com";
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -139,6 +139,51 @@ async function getOwner(token, ownerId) {
     // the whole lookup over it.
     return null;
   }
+}
+
+// HubSpot's UI shows a contact's associated Company record (name, domain,
+// etc.) separately from the contact's own "Company Name" property
+// (properties.company on the contact — a plain text field that only tracks
+// the association if it was set by typing into that field, not if the
+// company was associated via the Associations panel). The panel shows both
+// side by side rather than picking one, since they can legitimately
+// disagree.
+//
+// A contact can have more than one associated company; HubSpot lets exactly
+// one be flagged "Primary". That flag isn't visible on the plain v3
+// associations list (bare IDs only), so this uses the v4 endpoint, which
+// reports each association's type(s). typeId 1 (category HUBSPOT_DEFINED) is
+// HubSpot's stable identifier for the "Primary" contact-to-company
+// association — confirmed via GET /crm/v4/associations/contacts/companies/
+// labels. HubSpot's own docs warn that the *label text* ("Primary") can be
+// renamed per portal, so this matches on typeId, not the label string.
+//
+// v4 is on a deprecation path (HubSpot is moving to date-based API
+// versions; v4 support ends March 2027) but is still the best-documented,
+// stable option today and everything else in this file is on v3 anyway —
+// worth a full versioning pass across the project at some point, not scoped
+// to this one call.
+const PRIMARY_COMPANY_ASSOCIATION_TYPE_ID = 1;
+
+async function getPrimaryCompanyForContact(token, contactId) {
+  const assoc = await hubspotFetch(
+    token,
+    `/crm/v4/objects/contacts/${contactId}/associations/companies`
+  );
+  const results = assoc.results || [];
+  if (results.length === 0) return null;
+
+  const primary = results.find((r) =>
+    (r.associationTypes || []).some(
+      (t) => t.category === "HUBSPOT_DEFINED" && t.typeId === PRIMARY_COMPANY_ASSOCIATION_TYPE_ID
+    )
+  );
+  // Nothing explicitly flagged primary (older data, or every association is
+  // unlabeled) — fall back to HubSpot's first result rather than showing
+  // nothing.
+  const companyId = (primary || results[0]).toObjectId;
+  if (!companyId) return null;
+  return hubspotFetch(token, `/crm/v3/objects/companies/${companyId}?properties=name,domain`);
 }
 
 async function getDealsForContact(token, contactId) {
@@ -334,7 +379,8 @@ async function testConnection(token, ownEmail) {
 }
 
 // ---------------------------------------------------------------------------
-// Cached contact bundle (contact + owner + deals) for one email address
+// Cached contact bundle (contact + owner + company + deals) for one email
+// address
 // ---------------------------------------------------------------------------
 
 async function getContactBundle(token, email) {
@@ -348,12 +394,20 @@ async function getContactBundle(token, email) {
     bundle = { found: false };
   } else {
     const ownerId = contact.properties && contact.properties.hubspot_owner_id;
-    const [owner, deals, activities] = await Promise.all([
+    const [owner, company, deals, activities] = await Promise.all([
       getOwner(token, ownerId),
+      getPrimaryCompanyForContact(token, contact.id).catch((err) => {
+        console.warn(
+          `[HubSpot for Thunderbird] company lookup for contact ${contact.id} failed:`,
+          err.status,
+          err.message
+        );
+        return null;
+      }),
       getDealsForContact(token, contact.id).catch(() => []),
       getActivityHistory(token, contact.id).catch(() => [])
     ]);
-    bundle = { found: true, contact, owner, deals, activities };
+    bundle = { found: true, contact, owner, company, deals, activities };
   }
 
   contactCache.set(key, { expires: Date.now() + CACHE_TTL_MS, data: bundle });
@@ -498,6 +552,7 @@ async function handleLookupForDisplayedMessage(tabId) {
       youSent: counterpart.youSent,
       contact: bundle.contact || null,
       owner: bundle.owner || null,
+      company: bundle.company || null,
       deals: bundle.deals || [],
       activities: bundle.activities || [],
       portalId: settings.portalId,
@@ -622,6 +677,7 @@ async function handleGetRecipientDetails(email) {
       email,
       contact: bundle.contact,
       owner: bundle.owner || null,
+      company: bundle.company || null,
       deals: bundle.deals || [],
       activities: bundle.activities || [],
       portalId: settings.portalId,

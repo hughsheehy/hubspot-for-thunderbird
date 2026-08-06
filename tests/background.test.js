@@ -188,6 +188,110 @@ test("createContact (used by both the message panel and the compose panel) creat
   assert.equal(requestBody.properties.firstname, "New");
 });
 
+// Shared by the two company tests below: everything except the
+// contacts/associations/companies response is identical, so the fetchImpl
+// only needs a companiesAssociationResponse override.
+function companyLookupFetchImpl(companiesAssociationResponse) {
+  return async (url) => {
+    if (url.includes("/contacts/search")) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          results: [{ id: "1", properties: { email: "person@example.com", company: "Text Company" } }]
+        })
+      };
+    }
+    if (url.includes("/contacts/1/associations/companies")) {
+      return { ok: true, status: 200, json: async () => companiesAssociationResponse };
+    }
+    if (url.includes("/companies/55")) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ id: "55", properties: { name: "Real Company Inc", domain: "realcompany.com" } })
+      };
+    }
+    if (url.includes("/companies/56")) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ id: "56", properties: { name: "Other Company LLC", domain: "othercompany.com" } })
+      };
+    }
+    // Deals and the four activity types all list associations the same
+    // way; empty results short-circuit before any batch/read call.
+    if (/\/associations\/(deals|emails|calls|meetings|notes)$/.test(url)) {
+      return { ok: true, status: 200, json: async () => ({ results: [] }) };
+    }
+    throw new Error(`Unexpected HubSpot request: ${url}`);
+  };
+}
+
+const DISPLAYED_MESSAGE_FIXTURE = {
+  id: 1,
+  author: "person@example.com",
+  recipients: [],
+  ccList: [],
+  bccList: [],
+  subject: "Hi",
+  date: "2026-08-06T10:00:00Z"
+};
+
+test("a found contact includes the associated Company record, shown alongside the contact's text company field", async () => {
+  const harness = createHarness({
+    settings: { accessToken: "token" },
+    message: DISPLAYED_MESSAGE_FIXTURE,
+    fetchImpl: companyLookupFetchImpl({
+      results: [{ toObjectId: "55", associationTypes: [{ category: "HUBSPOT_DEFINED", typeId: 1, label: "Primary" }] }]
+    })
+  });
+
+  const result = await harness.send({ type: "lookupForDisplayedMessage", tabId: 1 });
+
+  assert.equal(result.status, "found");
+  assert.equal(result.contact.properties.company, "Text Company");
+  assert.equal(result.company.properties.name, "Real Company Inc");
+});
+
+test("with multiple associated companies, the one flagged Primary is used, not just the first result", async () => {
+  const harness = createHarness({
+    settings: { accessToken: "token" },
+    message: DISPLAYED_MESSAGE_FIXTURE,
+    fetchImpl: companyLookupFetchImpl({
+      results: [
+        // Listed first, but not the primary — a naive "take results[0]"
+        // implementation would wrongly pick this one.
+        { toObjectId: "56", associationTypes: [{ category: "HUBSPOT_DEFINED", typeId: 279, label: null }] },
+        { toObjectId: "55", associationTypes: [{ category: "HUBSPOT_DEFINED", typeId: 1, label: "Primary" }] }
+      ]
+    })
+  });
+
+  const result = await harness.send({ type: "lookupForDisplayedMessage", tabId: 1 });
+
+  assert.equal(result.status, "found");
+  assert.equal(result.company.properties.name, "Real Company Inc");
+});
+
+test("with multiple associated companies and none flagged Primary, falls back to the first result", async () => {
+  const harness = createHarness({
+    settings: { accessToken: "token" },
+    message: DISPLAYED_MESSAGE_FIXTURE,
+    fetchImpl: companyLookupFetchImpl({
+      results: [
+        { toObjectId: "56", associationTypes: [{ category: "HUBSPOT_DEFINED", typeId: 279, label: null }] },
+        { toObjectId: "55", associationTypes: [{ category: "HUBSPOT_DEFINED", typeId: 279, label: null }] }
+      ]
+    })
+  });
+
+  const result = await harness.send({ type: "lookupForDisplayedMessage", tabId: 1 });
+
+  assert.equal(result.status, "found");
+  assert.equal(result.company.properties.name, "Other Company LLC");
+});
+
 test("malformed message dates use a valid fallback timestamp", () => {
   const harness = createHarness();
   assert.equal(vm.runInContext('messageTimestampMs("not-a-date", 1234)', harness.context), 1234);

@@ -269,18 +269,32 @@ function renderDealsListInto(container, deals, currencyCode) {
   }
 }
 
-/** Clears `dl` (a <dl> element) and fills it with the standard contact fields. */
-function renderContactFieldsInto(dl, props, ownerLabel) {
+/**
+ * Clears `dl` (a <dl> element) and fills it with the standard contact fields.
+ * `companyLabel`, when given, is the name of the contact's associated
+ * Company record (see companyDisplayLabel), shown as its own "Company" row.
+ * The contact's own free-text "Company Name" property (props.company) gets
+ * a second, separate row — only when it actually has a value — rather than
+ * being folded into the first, since the two can legitimately disagree: the
+ * text property only reflects the association if it was set by typing into
+ * that field, not if the company was associated via the Associations panel.
+ */
+function renderContactFieldsInto(dl, props, ownerLabel, companyLabel) {
   dl.innerHTML = "";
   const fields = [
     ["panel_field_title", props.jobtitle],
-    ["panel_field_company", props.company],
+    ["panel_field_company", companyLabel]
+  ];
+  if (props.company) {
+    fields.push(["panel_field_company_text", props.company]);
+  }
+  fields.push(
     ["panel_field_phone", props.phone],
     ["panel_field_lifecycle", props.lifecyclestage],
     ["panel_field_lead_status", props.hs_lead_status],
     ["panel_field_owner", ownerLabel],
     ["panel_field_last_contacted", formatDate(props.notes_last_contacted)]
-  ];
+  );
   for (const [labelKey, value] of fields) {
     const dt = document.createElement("dt");
     dt.textContent = i18n(labelKey);
@@ -295,4 +309,8 @@ function ownerDisplayLabel(owner) {
   return owner
     ? [owner.firstName, owner.lastName].filter(Boolean).join(" ") || owner.email
     : i18n("panel_owner_unknown");
+}
+
+function companyDisplayLabel(company) {
+  return (company && company.properties && company.properties.name) || null;
 }
