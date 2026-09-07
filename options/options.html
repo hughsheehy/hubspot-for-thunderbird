@@ -38,6 +38,22 @@
       </table>
     </section>
 
+    <section class="card consent-card">
+      <h2 data-i18n="options_consent_heading"></h2>
+      <p data-i18n="options_consent_intro"></p>
+      <ul class="consent-list">
+        <li data-i18n="options_consent_item_address"></li>
+        <li data-i18n="options_consent_item_message"></li>
+        <li data-i18n="options_consent_item_token"></li>
+      </ul>
+      <p data-i18n="options_consent_when"></p>
+      <label class="consent-toggle">
+        <input type="checkbox" id="enabled-input">
+        <span data-i18n="options_consent_checkbox_label"></span>
+      </label>
+      <p class="field-help" data-i18n="options_consent_help"></p>
+    </section>
+
     <section class="card">
       <label class="field-label" for="token-input" data-i18n="options_token_label"></label>
       <div class="token-row">
@@ -78,7 +94,10 @@
       <p id="save-status" class="status-line" aria-live="polite"></p>
     </section>
 
-    <p class="privacy-note" data-i18n="options_privacy_note"></p>
+    <p class="privacy-note">
+      <span data-i18n="options_privacy_note"></span>
+      <a href="../PRIVACY.md" target="_blank" data-i18n="options_privacy_link"></a>
+    </p>
   </div>
 
   <script src="../popup/common.js"></script>

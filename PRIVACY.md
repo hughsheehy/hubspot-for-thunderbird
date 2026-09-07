@@ -4,6 +4,20 @@ HubSpot for Thunderbird is a local-only bridge between your Thunderbird
 profile and your own HubSpot account. There is no server operated by this
 project, no analytics, and no telemetry.
 
+## Opt-in: nothing is sent until you turn it on
+
+Network access to HubSpot is **off by default**. The add-on's settings page
+carries a single switch, *Allow this add-on to send the data described above
+to my HubSpot account*, together with a plain-language list of exactly what
+is transmitted. Until you tick it, every outbound request is refused at
+`hubspotFetch()` in `background.js` — the one function in this add-on that
+opens a network connection — and the message panels tell you that HubSpot
+access is off instead of contacting anything.
+
+Switching it back off takes effect immediately: outbound requests stop and
+the in-memory lookup cache is cleared. Your token and other settings are
+kept, so turning it on again does not mean re-entering them.
+
 ## What data this add-on touches
 
 - **Message headers and bodies** of the message currently open in the reading
@@ -22,12 +36,16 @@ Everywhere data can go is listed here, in full:
 - **api.hubapi.com** — the only network destination this add-on ever
   contacts. Requests carry your access token and, depending on the action,
   an email address, a message subject/body, or contact properties. This
-  happens only when a message is open in a message-display or compose tab,
-  or when you press **Test connection**, **Create contact**, or **Log this
-  message**.
+  happens only when the opt-in described above is switched on, and then only
+  when a message is open in a message-display or compose tab, or when you
+  press **Test connection**, **Create contact**, or **Log this message**.
+  Message subjects and bodies are sent only for the specific message you
+  press **Log this message** on; messages you merely read are not sent.
 - **Thunderbird's local `storage.local`** — your token, portal ID, BCC
-  address, currency, and never-log list are stored here, on this device,
-  in your Thunderbird profile. They are not synced to Mozilla Sync or
+  address, currency, never-log list, and identifiers for messages logged in
+  the last 90 days are stored here, on this device, in your Thunderbird
+  profile. The message identifiers prevent duplicate logging; message bodies
+  are not stored in this registry. Nothing here is synced to Mozilla Sync or
   anywhere else.
 - **In-memory cache** — looked-up contacts, owners, and deals are cached in
   the background script's memory for five minutes to avoid refetching while

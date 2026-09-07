@@ -207,3 +207,36 @@ textarea {
   font-size: 12px;
   text-align: center;
 }
+
+/* Consent opt-in — deliberately prominent, since nothing works until it's on. */
+.consent-card {
+  border-left: 4px solid var(--accent, #ff7a59);
+}
+
+.consent-list {
+  margin: 8px 0 12px;
+  padding-left: 20px;
+  font-size: 13px;
+}
+
+.consent-list li {
+  margin-bottom: 6px;
+}
+
+.consent-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 14px 0 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.consent-toggle input {
+  width: auto;
+  margin: 2px 0 0;
+  flex: none;
+}

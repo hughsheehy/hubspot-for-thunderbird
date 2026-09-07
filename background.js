@@ -14,10 +14,13 @@
 // this exact build tag) in the Inspect console right after reloading the
 // add-on, Thunderbird is still running the previous build — temporary
 // add-ons don't pick up file changes until you explicitly reload them.
-console.info("[HubSpot for Thunderbird] background.js loaded — build 0.1.4 (contact-company)");
+console.info("[HubSpot for Thunderbird] background.js loaded — build 0.1.6 (explicit-opt-in)");
 
 const HUBSPOT_API_BASE = "https://api.hubapi.com";
 const CACHE_TTL_MS = 5 * 60 * 1000;
+const LOGGED_MESSAGE_STORAGE_KEY = "loggedMessages";
+const LOGGED_MESSAGE_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+const MAX_LOGGED_MESSAGE_KEYS = 1000;
 
 // HubSpot's default "Email to Contact" engagement association type.
 // (associationCategory: HUBSPOT_DEFINED, typeId: 198.) If HubSpot changes
@@ -26,6 +29,9 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 const EMAIL_TO_CONTACT_ASSOCIATION_TYPE_ID = 198;
 
 const DEFAULT_SETTINGS = {
+  // Explicit, disclosed opt-in. Until the user turns this on in the options
+  // page, hubspotFetch() refuses to run and nothing leaves this device.
+  hubspotEnabled: false,
   accessToken: "",
   portalId: "",
   bccAddress: "",
@@ -37,6 +43,11 @@ const DEFAULT_SETTINGS = {
 const contactCache = new Map();
 // ownerId -> { expires, data }
 const ownerCache = new Map();
+// Prevent concurrent popup instances from logging the same message, and keep
+// successful logs protected even if persisting the registry happens to fail.
+const loggingInProgress = new Set();
+const loggedThisSession = new Set();
+let loggedMessageWriteQueue = Promise.resolve();
 
 // ---------------------------------------------------------------------------
 // Settings
@@ -44,7 +55,11 @@ const ownerCache = new Map();
 
 async function getSettings() {
   const stored = await browser.storage.local.get("settings");
-  return Object.assign({}, DEFAULT_SETTINGS, stored.settings || {});
+  const settings = Object.assign({}, DEFAULT_SETTINGS, stored.settings || {});
+  // Consent is a strict boolean: anything else (missing, undefined, a stray
+  // truthy string from an older build) means "not granted".
+  settings.hubspotEnabled = settings.hubspotEnabled === true;
+  return settings;
 }
 
 async function saveSettings(partial) {
@@ -67,7 +82,22 @@ browser.storage.onChanged.addListener((changes, area) => {
 // Low-level HubSpot fetch
 // ---------------------------------------------------------------------------
 
+/**
+ * The one and only place this add-on opens a network connection. Every caller
+ * funnels through here, so gating it here means no email address, message
+ * subject, or message body can reach api.hubapi.com unless the user has
+ * ticked the disclosed opt-in on the options page.
+ */
 async function hubspotFetch(token, path, { method = "GET", body } = {}) {
+  const settings = await getSettings();
+  if (!settings.hubspotEnabled) {
+    const err = new Error(
+      "HubSpot access is turned off. Enable it in the add-on's settings before sending anything to HubSpot."
+    );
+    err.code = "NOT_ENABLED";
+    throw err;
+  }
+
   const resp = await fetch(HUBSPOT_API_BASE + path, {
     method,
     headers: {
@@ -455,6 +485,51 @@ function displayedMessageParticipants(message) {
   ]);
 }
 
+function messageLogKey(message) {
+  if (message.headerMessageId) {
+    return `header:${String(message.headerMessageId).trim().toLowerCase()}`;
+  }
+  const folder = message.folder || {};
+  return `local:${folder.accountId || ""}:${folder.path || ""}:${message.id}`;
+}
+
+async function isMessageAlreadyLogged(key) {
+  if (loggedThisSession.has(key)) return true;
+  const stored = await browser.storage.local.get(LOGGED_MESSAGE_STORAGE_KEY);
+  const registry = stored[LOGGED_MESSAGE_STORAGE_KEY] || {};
+  const loggedAt = Number(registry[key]);
+  return Number.isFinite(loggedAt) && Date.now() - loggedAt <= LOGGED_MESSAGE_RETENTION_MS;
+}
+
+async function rememberLoggedMessage(key) {
+  const now = Date.now();
+  loggedThisSession.add(key);
+
+  try {
+    const write = loggedMessageWriteQueue.then(async () => {
+      const stored = await browser.storage.local.get(LOGGED_MESSAGE_STORAGE_KEY);
+      const registry = stored[LOGGED_MESSAGE_STORAGE_KEY] || {};
+      const recentEntries = Object.entries(registry)
+        .filter(([entryKey, loggedAt]) =>
+          entryKey !== key &&
+          Number.isFinite(Number(loggedAt)) &&
+          now - Number(loggedAt) <= LOGGED_MESSAGE_RETENTION_MS
+        )
+        .sort((a, b) => Number(b[1]) - Number(a[1]))
+        .slice(0, MAX_LOGGED_MESSAGE_KEYS - 1);
+      await browser.storage.local.set({
+        [LOGGED_MESSAGE_STORAGE_KEY]: Object.fromEntries([[key, now], ...recentEntries])
+      });
+    });
+    loggedMessageWriteQueue = write.catch(() => undefined);
+    await write;
+  } catch (err) {
+    // The HubSpot write has already succeeded. Keep the in-memory protection
+    // and don't report failure, which could encourage the user to retry.
+    console.warn("[HubSpot for Thunderbird] Could not persist logged-message deduplication:", err.message);
+  }
+}
+
 async function composeParticipants(details) {
   const identities = await browser.identities.list();
   const identity = identities.find((item) => item.id === details.identityId);
@@ -525,6 +600,7 @@ function normalizeIncomingSettings(settings) {
   if (Array.isArray(next.neverLogList)) {
     next.neverLogList = next.neverLogList.map((s) => s.trim().toLowerCase()).filter(Boolean);
   }
+  next.hubspotEnabled = next.hubspotEnabled === true;
   next.accessToken = (next.accessToken || "").trim();
   next.portalId = (next.portalId || "").trim();
   next.bccAddress = (next.bccAddress || "").trim();
@@ -533,6 +609,7 @@ function normalizeIncomingSettings(settings) {
 
 async function handleLookupForDisplayedMessage(tabId) {
   const settings = await getSettings();
+  if (!settings.hubspotEnabled) return { status: "not_enabled" };
   if (!settings.accessToken) return { status: "not_configured" };
 
   const counterpart = await resolveCounterpart(tabId);
@@ -556,7 +633,10 @@ async function handleLookupForDisplayedMessage(tabId) {
       deals: bundle.deals || [],
       activities: bundle.activities || [],
       portalId: settings.portalId,
-      currencyCode: settings.currencyCode
+      currencyCode: settings.currencyCode,
+      alreadyLogged: bundle.found
+        ? await isMessageAlreadyLogged(messageLogKey(counterpart.message))
+        : false
     };
   } catch (err) {
     return { status: "error", error: err.message };
@@ -565,6 +645,7 @@ async function handleLookupForDisplayedMessage(tabId) {
 
 async function handleCreateContact(email, properties) {
   const settings = await getSettings();
+  if (!settings.hubspotEnabled) return { status: "not_enabled" };
   if (!settings.accessToken) return { status: "not_configured" };
   if (isNeverLogged(email, settings.neverLogList)) return { status: "never_log", email };
 
@@ -582,6 +663,7 @@ async function handleCreateContact(email, properties) {
 
 async function handleLogDisplayedMessage(tabId) {
   const settings = await getSettings();
+  if (!settings.hubspotEnabled) return { status: "not_enabled" };
   if (!settings.accessToken) return { status: "not_configured" };
 
   const counterpart = await resolveCounterpart(tabId);
@@ -596,7 +678,13 @@ async function handleLogDisplayedMessage(tabId) {
     return { status: "never_log", email: excludedParticipant.email };
   }
 
+  const logKey = messageLogKey(counterpart.message);
+  if (loggingInProgress.has(logKey)) return { status: "logging_in_progress" };
+  loggingInProgress.add(logKey);
+
   try {
+    if (await isMessageAlreadyLogged(logKey)) return { status: "already_logged" };
+
     const bundle = await getContactBundle(settings.accessToken, email);
     if (!bundle.found) return { status: "not_found", email };
 
@@ -611,15 +699,19 @@ async function handleLogDisplayedMessage(tabId) {
       direction: counterpart.youSent ? "EMAIL" : "INCOMING_EMAIL",
       timestampMs
     });
+    await rememberLoggedMessage(logKey);
 
     return { status: "logged" };
   } catch (err) {
     return { status: "error", error: err.message };
+  } finally {
+    loggingInProgress.delete(logKey);
   }
 }
 
 async function handleLookupComposeRecipients(tabId) {
   const settings = await getSettings();
+  if (!settings.hubspotEnabled) return { status: "not_enabled" };
   if (!settings.accessToken) return { status: "not_configured" };
 
   const details = await browser.compose.getComposeDetails(tabId);
@@ -666,6 +758,7 @@ async function handleLookupComposeRecipients(tabId) {
 // check). Reuses the same 5-minute contactCache as the message panel.
 async function handleGetRecipientDetails(email) {
   const settings = await getSettings();
+  if (!settings.hubspotEnabled) return { status: "not_enabled" };
   if (!settings.accessToken) return { status: "not_configured" };
   if (isNeverLogged(email, settings.neverLogList)) return { status: "never_log", email };
 
@@ -690,6 +783,9 @@ async function handleGetRecipientDetails(email) {
 
 async function handleAddLoggingBcc(tabId) {
   const settings = await getSettings();
+  // No API call happens here, but the BCC causes the sent message to be copied
+  // to HubSpot, so it sits behind the same consent gate.
+  if (!settings.hubspotEnabled) return { status: "not_enabled" };
   if (!settings.bccAddress) return { status: "no_bcc_configured" };
 
   const details = await browser.compose.getComposeDetails(tabId);

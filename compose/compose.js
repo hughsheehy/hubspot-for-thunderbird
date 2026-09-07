@@ -37,6 +37,10 @@ async function load() {
       tabId: currentTabId
     });
 
+    if (result.status === "not_enabled") {
+      showState("state-not-enabled");
+      return;
+    }
     if (result.status === "not_configured") {
       showState("state-not-configured");
       return;
@@ -294,6 +298,11 @@ async function handleAddBcc() {
     });
 
     switch (result.status) {
+      case "not_enabled":
+        keepDisabled = true;
+        status.classList.add("error");
+        status.textContent = i18n("compose_error_not_enabled");
+        break;
       case "added":
         status.classList.remove("error");
         status.textContent = i18n("compose_bcc_added");
@@ -326,9 +335,11 @@ async function handleAddBcc() {
 
 document.addEventListener("DOMContentLoaded", () => {
   applyI18n(document);
-  document.getElementById("open-settings-btn").addEventListener("click", () => {
-    browser.runtime.openOptionsPage();
-  });
+  for (const id of ["open-settings-btn", "open-settings-btn-2"]) {
+    document.getElementById(id).addEventListener("click", () => {
+      browser.runtime.openOptionsPage();
+    });
+  }
   document.getElementById("add-bcc-btn").addEventListener("click", handleAddBcc);
   load();
 });

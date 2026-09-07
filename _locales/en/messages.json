@@ -41,12 +41,15 @@
   "panel_activity_call_inbound": { "message": "Inbound" },
   "panel_activity_call_outbound": { "message": "Outbound" },
   "panel_log_button": { "message": "Log this message" },
+  "panel_log_button_already_logged": { "message": "Already logged" },
   "panel_logging": { "message": "Logging…" },
   "panel_log_success": { "message": "Logged to timeline." },
+  "panel_log_already_logged": { "message": "This message was already logged from this Thunderbird profile." },
   "panel_log_never_log_blocked": { "message": "Logging blocked because $EMAIL$ is on your never-log list.", "placeholders": { "email": { "content": "$1" } } },
   "panel_log_error": { "message": "Couldn't log this message." },
   "panel_error_heading": { "message": "Something went wrong" },
   "panel_error_generic": { "message": "HubSpot request failed. Check the Console for details." },
+  "panel_error_not_enabled": { "message": "HubSpot access is turned off, so nothing has been sent. Turn it on in Settings to look up this sender in HubSpot." },
   "panel_error_not_configured": { "message": "Add your HubSpot access token in Settings to get started." },
   "panel_error_not_configured_link": { "message": "Open settings" },
 
@@ -67,6 +70,7 @@
   "compose_loading": { "message": "Checking recipients…" },
   "compose_loading_details": { "message": "Loading details…" },
   "compose_details_unavailable": { "message": "Details unavailable." },
+  "compose_error_not_enabled": { "message": "HubSpot access is turned off, so nothing has been sent. Turn it on in Settings to look up these recipients in HubSpot." },
   "compose_error_not_configured": { "message": "Add your HubSpot access token in Settings to get started." },
 
   "options_page_title": { "message": "HubSpot for Thunderbird — Settings" },
@@ -103,6 +107,15 @@
   "options_never_log_label": { "message": "Never-log list" },
   "options_never_log_help": { "message": "One address or domain per line, e.g. person@example.com or example.com. These are never looked up or logged." },
   "options_never_log_placeholder": { "message": "example.com\nsomeone@personal-email.com" },
+  "options_consent_heading": { "message": "Send data to HubSpot" },
+  "options_consent_intro": { "message": "This add-on is turned off until you switch it on here. While it is on, it sends the following from this device to HubSpot's API at api.hubapi.com, over HTTPS:" },
+  "options_consent_item_address": { "message": "The email address, and display name if present, of the person whose message you are reading or composing — used to find their HubSpot contact record." },
+  "options_consent_item_message": { "message": "The subject and body of a message, but only for the specific message you press \u201cLog this message\u201d on. Messages you merely read are never sent." },
+  "options_consent_item_token": { "message": "Your HubSpot access token, as the authorization header on each request, so HubSpot knows the request is yours." },
+  "options_consent_when": { "message": "Nothing is sent while this is off, and nothing is ever sent to the add-on's authors, to any analytics or telemetry service, or to any third party. HubSpot is the only destination this add-on can reach. Addresses on your never-log list are skipped even while it is on." },
+  "options_consent_checkbox_label": { "message": "Allow this add-on to send the data described above to my HubSpot account" },
+  "options_consent_help": { "message": "You can switch this off at any time. Turning it off stops all outbound requests immediately and clears the in-memory lookup cache; your settings are kept." },
+  "options_consent_required_hint": { "message": "Turn on \u201cSend data to HubSpot\u201d above before testing the connection." },
   "options_save_button": { "message": "Save settings" },
   "options_saved_notice": { "message": "Saved." },
   "options_test_button": { "message": "Test connection" },
@@ -110,5 +123,6 @@
   "options_test_success": { "message": "Connected as $NAME$. Contact read access is working.", "placeholders": { "name": { "content": "$1" } } },
   "options_test_success_generic": { "message": "Connected successfully. Contact read access is working." },
   "options_test_failure": { "message": "Couldn't connect: $ERROR$", "placeholders": { "error": { "content": "$1" } } },
-  "options_privacy_note": { "message": "No analytics, no telemetry, no third-party servers. All requests go straight from this device to api.hubapi.com." }
+  "options_privacy_link": { "message": "Read the full privacy statement." },
+  "options_privacy_note": { "message": "No analytics, no telemetry, no third-party servers. All requests go straight from this device to api.hubapi.com, and only while the opt-in above is switched on." }
 }

@@ -119,13 +119,20 @@ scoped by you, revocable by you, and no third party ever sees it.
 
 ## Privacy
 
+HubSpot access is **off by default**. The settings page carries an explicit
+opt-in that lists exactly what gets sent to `api.hubapi.com`, and until you
+tick it every outbound request is refused at `hubspotFetch()` — the single
+function in this add-on that opens a network connection.
+
 No analytics, no telemetry, no third-party servers. See [PRIVACY.md](PRIVACY.md).
 
 ## Limitations
 
 - Lookup is an exact match on the contact's `email` property; mail from a
   secondary address will not resolve
-- Logging does not deduplicate — pressing the button twice logs twice
+- Direct logging is deduplicated within this Thunderbird profile for 90 days;
+  logs created from another profile, device, client, or HubSpot's BCC pipeline
+  cannot be detected locally
 - Attachments are not uploaded with a logged message
 - Logs against the contact only, not a specific deal or ticket
 - No open or click tracking; that needs HubSpot's own send infrastructure

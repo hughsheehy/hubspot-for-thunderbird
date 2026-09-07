@@ -61,6 +61,10 @@ function showError(err) {
 
 function render(result) {
   switch (result.status) {
+    case "not_enabled":
+      showState("state-not-enabled");
+      break;
+
     case "not_configured":
       showState("state-not-configured");
       break;
@@ -102,7 +106,7 @@ function render(result) {
 }
 
 function renderFound(result) {
-  const { contact, owner, company, deals, portalId, currencyCode, youSent } = result;
+  const { contact, owner, company, deals, portalId, currencyCode, youSent, alreadyLogged } = result;
   const props = contact.properties || {};
 
   document.getElementById("you-sent-note").hidden = !youSent;
@@ -128,8 +132,11 @@ function renderFound(result) {
   renderActivityListInto(document.getElementById("activity-list"), result.activities || []);
 
   const logButton = document.getElementById("log-button");
-  logButton.disabled = false;
-  document.getElementById("log-status").textContent = "";
+  logButton.disabled = !!alreadyLogged;
+  logButton.textContent = i18n(alreadyLogged ? "panel_log_button_already_logged" : "panel_log_button");
+  document.getElementById("log-status").textContent = alreadyLogged
+    ? i18n("panel_log_already_logged")
+    : "";
   logButton.dataset.contactId = contact.id;
 }
 
@@ -178,6 +185,7 @@ async function handleLogMessage() {
   btn.disabled = true;
   status.classList.remove("error");
   status.textContent = i18n("panel_logging");
+  let keepDisabled = false;
 
   try {
     const result = await browser.runtime.sendMessage({
@@ -186,7 +194,13 @@ async function handleLogMessage() {
     });
 
     if (result.status === "logged") {
+      keepDisabled = true;
+      btn.textContent = i18n("panel_log_button_already_logged");
       status.textContent = i18n("panel_log_success");
+    } else if (result.status === "already_logged" || result.status === "logging_in_progress") {
+      keepDisabled = true;
+      btn.textContent = i18n("panel_log_button_already_logged");
+      status.textContent = i18n("panel_log_already_logged");
     } else if (result.status === "never_log") {
       status.classList.add("error");
       status.textContent = i18n("panel_log_never_log_blocked", [result.email]);
@@ -198,15 +212,17 @@ async function handleLogMessage() {
     status.classList.add("error");
     status.textContent = err && err.message ? err.message : i18n("panel_log_error");
   } finally {
-    btn.disabled = false;
+    btn.disabled = keepDisabled;
   }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   applyI18n(document);
-  document.getElementById("open-settings-btn").addEventListener("click", () => {
-    browser.runtime.openOptionsPage();
-  });
+  for (const id of ["open-settings-btn", "open-settings-btn-2"]) {
+    document.getElementById(id).addEventListener("click", () => {
+      browser.runtime.openOptionsPage();
+    });
+  }
   document.getElementById("create-contact-btn").addEventListener("click", handleCreateContact);
   document.getElementById("log-button").addEventListener("click", handleLogMessage);
   load();
